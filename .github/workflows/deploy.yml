@@ -28,7 +28,7 @@ jobs:
           RSYNC_SRC: "./"     # carpeta del repo
           RSYNC_DEST: "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST_PROD }}:${{ secrets.VPS_PATH_PROD }}"
         run: |
-          rsync -avz --delete --exclude ".git/" --exclude ".github/" "$RSYNC_SRC" "$RSYNC_DEST"
+          rsync -avz --delete --exclude ".gitignore"  --exclude ".github/" --exclude ".git/" --exclude "deploy.sh" "$RSYNC_SRC" "$RSYNC_DEST"
 
   deploy_dev:
     name: Deploy to STAGING (dev)
@@ -53,4 +53,4 @@ jobs:
           RSYNC_SRC: "./"    # carpeta del repo
           RSYNC_DEST: "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST_DEV }}:${{ secrets.VPS_PATH_DEV }}"
         run: |
-          rsync -avz --delete --exclude ".git/" --exclude ".github/" "$RSYNC_SRC" "$RSYNC_DEST"
+          rsync -avz --delete --exclude ".gitignore"  --exclude ".github/" --exclude ".git/" --exclude "deploy.sh" "$RSYNC_SRC" "$RSYNC_DEST"
