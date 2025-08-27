@@ -3,54 +3,52 @@ name: Deploy via rsync
 on:
   push:
     branches: [ main, dev ]
+  workflow_dispatch:
 
 jobs:
-  deploy_prod:
-    name: Deploy to PROD (main)
-    if: github.ref == 'refs/heads/main'
+  deploy:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
+    
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+    - name: Set deployment variables
+      run: |
+        if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+          echo "VPS_HOST=${{ secrets.VPS_HOST_PROD }}" >> $GITHUB_ENV
+          echo "VPS_PATH=${{ secrets.VPS_PATH_PROD }}" >> $GITHUB_ENV
+          echo "VPS_USER=${{ secrets.VPS_USER }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=production" >> $GITHUB_ENV
+        elif [[ ${{ github.ref }} == 'refs/heads/dev' ]]; then
+          echo "VPS_HOST=${{ secrets.VPS_HOST_DEV }}" >> $GITHUB_ENV
+          echo "VPS_PATH=${{ secrets.VPS_PATH_DEV }}" >> $GITHUB_ENV
+          echo "VPS_USER=${{ secrets.VPS_USER }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=development" >> $GITHUB_ENV
+        fi
 
-      - name: Add host key to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan ${{ secrets.VPS_HOST_PROD }} >> ~/.ssh/known_hosts
+    - name: Display deployment info
+      run: |
+        echo "🚀 Deploying to ${{ env.ENVIRONMENT }}"
+        echo "📍 Host: ${{ env.VPS_HOST }}"
+        echo "📁 Path: ${{ env.VPS_PATH }}"
 
-      - name: Deploy with rsync
-        env:
-          RSYNC_SRC: "./"     # carpeta del repo
-          RSYNC_DEST: "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST_PROD }}:${{ secrets.VPS_PATH_PROD }}"
-        run: |
-          rsync -avz --delete --exclude ".gitignore"  --exclude ".github/" --exclude ".git/" --exclude "deploy.sh" "$RSYNC_SRC" "$RSYNC_DEST"
+    - name: Setup SSH agent
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
-  deploy_dev:
-    name: Deploy to STAGING (dev)
-    if: github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Add host key to known_hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+    - name: Deploy with rsync
+      run: |                    
+        rsync -avz --delete   --exclude ".gitignore"  --exclude ".github/" --exclude ".git/" --exclude "README.md"  --exclude "build_fingerprint.py" ./  ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.VPS_PATH }}/
 
-      - name: Add host key to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan ${{ secrets.VPS_HOST_DEV }} >> ~/.ssh/known_hosts
+    - name: Deployment complete
+      run: |
+        echo "🎉 Deployment to ${{ env.ENVIRONMENT }} completed successfully!"
 
-      - name: Deploy with rsync
-        env:
-          RSYNC_SRC: "./"    # carpeta del repo
-          RSYNC_DEST: "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST_DEV }}:${{ secrets.VPS_PATH_DEV }}"
-        run: |
-          rsync -avz --delete --exclude ".gitignore"  --exclude ".github/" --exclude ".git/" --exclude "deploy.sh" "$RSYNC_SRC" "$RSYNC_DEST"
