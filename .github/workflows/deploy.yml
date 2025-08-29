@@ -49,11 +49,7 @@ jobs:
 
     - name: Deploy with rsync
       run: |                    
-        rsync -avz --delete dist/ ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.VPS_PATH }}/
-        
-    - name: Set correct permissions
-      run: |
-        ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "chown -R www-data:www-data ${{ env.VPS_PATH }} && chmod -R 755 ${{ env.VPS_PATH }}"
+        rsync -avz --delete dist/ ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.VPS_PATH }}/            
         
     - name: Deployment summary
       run: |
