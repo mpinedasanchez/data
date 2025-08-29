@@ -2,7 +2,7 @@ name: Deploy via rsync
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ "*" ]
   workflow_dispatch:
 
 jobs:
@@ -13,26 +13,25 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     
-
+    - name: Extract branch name
+      run: |
+        echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+    
     - name: Set deployment variables
       run: |
-        if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
-          echo "VPS_HOST=${{ secrets.VPS_HOST_PROD }}" >> $GITHUB_ENV
-          echo "VPS_PATH=${{ secrets.VPS_PATH_PROD }}" >> $GITHUB_ENV
-          echo "VPS_USER=${{ secrets.VPS_USER }}" >> $GITHUB_ENV
-          echo "ENVIRONMENT=production" >> $GITHUB_ENV
-        elif [[ ${{ github.ref }} == 'refs/heads/dev' ]]; then
-          echo "VPS_HOST=${{ secrets.VPS_HOST_DEV }}" >> $GITHUB_ENV
-          echo "VPS_PATH=${{ secrets.VPS_PATH_DEV }}" >> $GITHUB_ENV
-          echo "VPS_USER=${{ secrets.VPS_USER }}" >> $GITHUB_ENV
-          echo "ENVIRONMENT=development" >> $GITHUB_ENV
-        fi
-
+        # Path base desde secreto + branch dinámico
+        echo "VPS_HOST=${{ secrets.VPS_HOST }}" >> $GITHUB_ENV
+        echo "VPS_USER=${{ secrets.VPS_USER }}" >> $GITHUB_ENV
+        echo "VPS_PATH=${{ secrets.VPS_PATH }}-${{ env.BRANCH_NAME }}/data" >> $GITHUB_ENV
+        
+     
     - name: Display deployment info
       run: |
-        echo "🚀 Deploying to ${{ env.ENVIRONMENT }}"
-        echo "📍 Host: ${{ env.VPS_HOST }}"
-        echo "📁 Path: ${{ env.VPS_PATH }}"
+        echo "Branch: ${{ env.BRANCH_NAME }}"
+        echo "Environment: ${{ env.ENVIRONMENT }}"
+        echo "Host: ${{ env.VPS_HOST }}"
+        echo "Path: ${{ env.VPS_PATH }}"
+        echo "Will test: https://${{ env.SUBDOMAIN }}.${{ env.VPS_HOST }}"
 
     - name: Setup SSH agent
       uses: webfactory/ssh-agent@v0.9.0
@@ -44,11 +43,21 @@ jobs:
         mkdir -p ~/.ssh
         ssh-keyscan ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts
 
+    - name: Ensure target directory exists
+      run: |
+        ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "mkdir -p ${{ env.VPS_PATH }}"
+
     - name: Deploy with rsync
       run: |                    
-        rsync -avz --delete   --exclude ".gitignore"  --exclude ".github/" --exclude ".git/" --exclude "README.md"  --exclude "build_fingerprint.py" ./  ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.VPS_PATH }}/
-
-    - name: Deployment complete
+        rsync -avz --delete dist/ ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.VPS_PATH }}/
+        
+    - name: Set correct permissions
       run: |
-        echo "🎉 Deployment to ${{ env.ENVIRONMENT }} completed successfully!"
-
+        ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "chown -R www-data:www-data ${{ env.VPS_PATH }} && chmod -R 755 ${{ env.VPS_PATH }}"
+        
+    - name: Deployment summary
+      run: |
+        echo "Deployment completed!"
+        echo "Branch: ${{ env.BRANCH_NAME }}"
+        echo "Path: ${{ env.VPS_PATH }}"
+        echo "URL: https://${{ env.SUBDOMAIN }}.${{ env.VPS_HOST }}"
